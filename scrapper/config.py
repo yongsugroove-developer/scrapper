@@ -31,7 +31,8 @@ class Settings:
     fetch_timeout_seconds: int
     openai_api_key: str
     openai_model: str
-    recipient_email: str
+    openai_base_url: str
+    recipient_emails: tuple[str, ...]
     sender_email: str
     smtp_host: str
     smtp_port: int
@@ -66,6 +67,16 @@ def _list_env(name: str, default_values: tuple[str, ...]) -> tuple[str, ...]:
     return values if values else default_values
 
 
+def _recipient_emails() -> tuple[str, ...]:
+    raw_multi = os.getenv("RECIPIENT_EMAILS", "").strip()
+    if raw_multi:
+        values = tuple(part.strip() for part in raw_multi.split(",") if part.strip())
+        if values:
+            # Keep order, remove duplicates.
+            return tuple(dict.fromkeys(values))
+    return (_required_env("RECIPIENT_EMAIL"),)
+
+
 def load_settings() -> Settings:
     load_dotenv()
 
@@ -82,8 +93,9 @@ def load_settings() -> Settings:
 
     openai_api_key = _required_env("OPENAI_API_KEY")
     openai_model = os.getenv("OPENAI_MODEL", "gpt-4.1-mini").strip() or "gpt-4.1-mini"
+    openai_base_url = os.getenv("OPENAI_BASE_URL", "").strip()
 
-    recipient_email = _required_env("RECIPIENT_EMAIL")
+    recipient_emails = _recipient_emails()
     smtp_username = _required_env("SMTP_USERNAME")
     smtp_app_password = _required_env("SMTP_APP_PASSWORD")
     sender_email = os.getenv("SENDER_EMAIL", "").strip() or smtp_username
@@ -107,7 +119,8 @@ def load_settings() -> Settings:
         fetch_timeout_seconds=fetch_timeout_seconds,
         openai_api_key=openai_api_key,
         openai_model=openai_model,
-        recipient_email=recipient_email,
+        openai_base_url=openai_base_url,
+        recipient_emails=recipient_emails,
         sender_email=sender_email,
         smtp_host=smtp_host,
         smtp_port=smtp_port,

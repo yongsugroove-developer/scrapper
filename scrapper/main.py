@@ -3,10 +3,7 @@ from __future__ import annotations
 import argparse
 import logging
 import sys
-
-from scrapper.config import load_settings
-from scrapper.pipeline import run_daily_pipeline
-
+import warnings
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Daily keyword crawler and email digest")
@@ -19,10 +16,26 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> int:
+    warnings.filterwarnings(
+        "ignore",
+        message=r"This package \(`duckduckgo_search`\) has been renamed to `ddgs`!.*",
+        category=RuntimeWarning,
+    )
+    warnings.filterwarnings("ignore", category=ResourceWarning)
+    warnings.simplefilter("ignore", ResourceWarning)
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s | %(levelname)s | %(message)s",
+        stream=sys.stdout,
     )
+    logging.getLogger("duckduckgo_search").setLevel(logging.WARNING)
+    logging.getLogger("trafilatura").setLevel(logging.CRITICAL)
+    logging.getLogger("trafilatura.utils").setLevel(logging.CRITICAL)
+    logging.getLogger("htmldate").setLevel(logging.CRITICAL)
+
+    from scrapper.config import load_settings
+    from scrapper.pipeline import run_daily_pipeline
+
     args = parse_args()
 
     try:
@@ -33,11 +46,19 @@ def main() -> int:
         return 1
 
     logging.info(
-        "Run completed | dry_run=%s searched=%s selected=%s summarized=%s sent_email=%s",
+        (
+            "Run completed | dry_run=%s searched=%s selected=%s summarized=%s "
+            "summary_success=%s summary_failed=%s summary_success_rate=%.2f "
+            "summary_failed_reasons=%s sent_email=%s"
+        ),
         report.dry_run,
         report.searched_count,
         report.selected_count,
         report.summarized_count,
+        report.summary_success_count,
+        report.summary_failed_count,
+        report.summary_success_rate,
+        dict(report.summary_failed_reason_counts),
         report.sent_email,
     )
     return 0

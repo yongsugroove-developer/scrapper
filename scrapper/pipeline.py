@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from datetime import datetime
+import logging
+from collections import Counter
 from zoneinfo import ZoneInfo
 
 from openai import OpenAI
@@ -13,6 +15,8 @@ from scrapper.search import build_queries, search_web
 from scrapper.storage import init_db, load_recent_sent, save_sent_articles
 from scrapper.summarizer import summarize_article
 from scrapper.text_extract import extract_article_text
+
+logger = logging.getLogger(__name__)
 
 
 def _collect_candidates(settings: Settings) -> tuple[int, int, list[ScoredArticle]]:
@@ -69,6 +73,7 @@ def _collect_candidates(settings: Settings) -> tuple[int, int, list[ScoredArticl
                 extracted_text=extracted.text,
                 extraction_method=extracted.method,
                 score=final_score,
+                published_at=extracted.published_at or result.published_at,
             )
         )
         selected_titles.append(result.title)
@@ -84,16 +89,30 @@ def run_daily_pipeline(settings: Settings, dry_run: bool = False) -> RunReport:
     searched_count, candidates_count, selected = _collect_candidates(settings)
 
     summarized: list[SummarizedArticle] = []
+    summary_success_count = 0
+    summary_failed_count = 0
+    summary_failed_urls: list[str] = []
+    summary_failed_reason_counter: Counter[str] = Counter()
     if selected:
-        client = OpenAI(api_key=settings.openai_api_key)
+        client_kwargs = {"api_key": settings.openai_api_key}
+        if settings.openai_base_url:
+            client_kwargs["base_url"] = settings.openai_base_url
+        client = OpenAI(**client_kwargs)
         for article in selected:
-            summary = summarize_article(client, settings.openai_model, settings.keyword, article)
+            summary_result = summarize_article(client, settings.openai_model, settings.keyword, article)
+            if summary_result.success:
+                summary_success_count += 1
+            else:
+                summary_failed_count += 1
+                summary_failed_urls.append(article.canonical_url)
+                summary_failed_reason_counter[summary_result.reason] += 1
             summarized.append(
                 SummarizedArticle(
                     title=article.search_result.title,
                     url=article.canonical_url,
                     score=article.score,
-                    summary=summary,
+                    summary=summary_result.text,
+                    published_at=article.published_at,
                 )
             )
 
@@ -103,12 +122,33 @@ def run_daily_pipeline(settings: Settings, dry_run: bool = False) -> RunReport:
         save_sent_articles(settings.db_path, summarized)
         sent_email = True
 
+    summary_success_rate = (
+        summary_success_count / len(summarized) if summarized else 0.0
+    )
+    if summary_failed_count > 0:
+        logger.warning(
+            (
+                "Summary quality check | failed=%s success=%s rate=%.2f "
+                "failed_reasons=%s failed_urls=%s"
+            ),
+            summary_failed_count,
+            summary_success_count,
+            summary_success_rate,
+            dict(summary_failed_reason_counter),
+            summary_failed_urls[:5],
+        )
+
     return RunReport(
         run_at=run_at,
         searched_count=searched_count,
         candidates_count=candidates_count,
         selected_count=len(selected),
         summarized_count=len(summarized),
+        summary_success_count=summary_success_count,
+        summary_failed_count=summary_failed_count,
+        summary_success_rate=summary_success_rate,
+        summary_failed_urls=tuple(summary_failed_urls),
+        summary_failed_reason_counts=tuple(summary_failed_reason_counter.items()),
         sent_email=sent_email,
         dry_run=dry_run,
     )

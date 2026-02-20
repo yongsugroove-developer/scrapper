@@ -4,7 +4,7 @@ Daily crawler + summarizer + email digest for the keyword:
 `sh 공사 마곡 분양`
 
 This MVP collects broad web results, extracts article text, ranks relevance,
-summarizes with OpenAI, and emails one daily digest at 08:00 Asia/Seoul.
+summarizes with OpenAI, and emails a daily digest at 08:00 Asia/Seoul.
 
 ## Features (MVP)
 - Broad keyword-based web search (no fixed target domain)
@@ -29,10 +29,13 @@ pip install -r requirements.txt
 
 Copy `.env.example` to `.env`, then set:
 - `OPENAI_API_KEY`
-- `RECIPIENT_EMAIL`
+- `RECIPIENT_EMAILS` (comma-separated, e.g. `a@example.com,b@example.com`)
 - `SMTP_USERNAME`
 - `SMTP_APP_PASSWORD`
 - optional `SENDER_EMAIL` (default = SMTP_USERNAME)
+
+Backward-compatible:
+- `RECIPIENT_EMAIL` (single recipient)
 
 For Gmail SMTP, use an app password.
 

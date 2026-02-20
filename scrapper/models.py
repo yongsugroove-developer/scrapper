@@ -11,12 +11,14 @@ class SearchResult:
     url: str
     snippet: str
     source: str
+    published_at: str = ""
 
 
 @dataclass(frozen=True)
 class ExtractedContent:
     text: str
     method: str
+    published_at: str = ""
 
 
 @dataclass(frozen=True)
@@ -26,6 +28,7 @@ class ScoredArticle:
     extracted_text: str
     extraction_method: str
     score: int
+    published_at: str = ""
 
 
 @dataclass(frozen=True)
@@ -34,6 +37,14 @@ class SummarizedArticle:
     url: str
     score: int
     summary: str
+    published_at: str = ""
+
+
+@dataclass(frozen=True)
+class SummaryResult:
+    text: str
+    success: bool
+    reason: str
 
 
 @dataclass(frozen=True)
@@ -43,6 +54,11 @@ class RunReport:
     candidates_count: int
     selected_count: int
     summarized_count: int
+    summary_success_count: int
+    summary_failed_count: int
+    summary_success_rate: float
+    summary_failed_urls: tuple[str, ...]
+    summary_failed_reason_counts: tuple[tuple[str, int], ...]
     sent_email: bool
     dry_run: bool
 

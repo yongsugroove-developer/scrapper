@@ -15,9 +15,11 @@ def _nl2br(text: str) -> str:
 
 
 def _render_article(index: int, article: SummarizedArticle) -> str:
+    published_at = escape(article.published_at) if article.published_at else "확인 불가"
     return (
         f"<h3>{index}. {escape(article.title)}</h3>"
         f"<p><b>URL:</b> <a href='{escape(article.url)}'>{escape(article.url)}</a></p>"
+        f"<p><b>게시일:</b> {published_at}</p>"
         f"<p><b>Relevance score:</b> {article.score}</p>"
         f"<p>{_nl2br(article.summary)}</p>"
         "<hr>"
@@ -60,7 +62,7 @@ def send_digest_email(
     message = MIMEMultipart("alternative")
     message["Subject"] = build_subject(run_at, settings.keyword)
     message["From"] = settings.sender_email
-    message["To"] = settings.recipient_email
+    message["To"] = ", ".join(settings.recipient_emails)
 
     html_body = build_html_body(run_at, settings.timezone, settings.keyword, articles)
     message.attach(MIMEText(html_body, "html", "utf-8"))
@@ -68,5 +70,5 @@ def send_digest_email(
     with smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=30) as smtp:
         smtp.starttls()
         smtp.login(settings.smtp_username, settings.smtp_app_password)
-        smtp.sendmail(settings.sender_email, [settings.recipient_email], message.as_string())
+        smtp.sendmail(settings.sender_email, list(settings.recipient_emails), message.as_string())
 
